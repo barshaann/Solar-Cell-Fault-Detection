@@ -37,14 +37,15 @@ export PYTHONPATH=src
 python scripts/train.py --config config.example.json --fine-tune
 ```
 
-By default this saves your trained model to:
+By default this saves:
 
-- `artifacts/solar_fault_detector.keras`
+- model: `artifacts/solar_fault_detector.keras`
+- split manifest: `artifacts/split_manifest.json` (same validation split reused for later test runs)
 
 ## Test later (after restart, no retraining needed)
 
 ```bash
-python scripts/test.py --config config.example.json --model artifacts/solar_fault_detector.keras
+python scripts/test.py --config config.example.json --model artifacts/solar_fault_detector.keras --split-manifest artifacts/split_manifest.json
 ```
 
 This loads the saved model and writes metrics to:
@@ -95,7 +96,7 @@ python scripts/app.py --model artifacts/solar_fault_detector.keras
 7. After any PC restart, **do not retrain**. Just test saved model:
 
    ```python
-   !PYTHONPATH=src python scripts/test.py --config config.example.json --model artifacts/solar_fault_detector.keras
+   !PYTHONPATH=src python scripts/test.py --config config.example.json --model artifacts/solar_fault_detector.keras --split-manifest artifacts/split_manifest.json
    ```
 
 8. Launch app from notebook cell:
@@ -110,3 +111,18 @@ python scripts/app.py --model artifacts/solar_fault_detector.keras
 2. Increase epochs and unfreeze more backbone layers only after baseline stabilizes.
 3. Track AUC + PR-AUC on a locked validation set.
 4. Add hard-negative mining and TTA for inference if latency budget allows.
+
+
+## Common GitHub PR conflict (README/requirements)
+
+If GitHub says *"This branch has conflicts that must be resolved"*, it means your branch and `main` edited overlapping lines.
+
+```bash
+git checkout work
+git fetch origin
+git merge origin/main
+# resolve conflicts in files, then:
+git add README.md requirements.txt
+git commit -m "Resolve merge conflicts"
+git push origin work
+```

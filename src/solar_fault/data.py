@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
+import json
 
 import numpy as np
 import pandas as pd
@@ -54,12 +54,24 @@ def load_image(path: str, image_size: int) -> np.ndarray:
 
 
 
+def _paths_to_arrays(train_paths: list[str], val_paths: list[str], df: pd.DataFrame, image_size: int) -> DatasetSplit:
+    label_map = {row.full_path: int(row.label) for row in df.itertuples(index=False)}
+
+    x_train = np.stack([load_image(p, image_size) for p in train_paths], axis=0)
+    x_val = np.stack([load_image(p, image_size) for p in val_paths], axis=0)
+    y_train = np.array([label_map[p] for p in train_paths], dtype=np.float32)
+    y_val = np.array([label_map[p] for p in val_paths], dtype=np.float32)
+
+    return DatasetSplit(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val)
+
+
+
 def make_split(cfg: DataConfig) -> DatasetSplit:
     df = load_dataframe(cfg)
     paths = df["full_path"].values
     labels = df["label"].values
 
-    x_train_path, x_val_path, y_train, y_val = train_test_split(
+    x_train_path, x_val_path, _, _ = train_test_split(
         paths,
         labels,
         test_size=cfg.test_size,
@@ -67,15 +79,40 @@ def make_split(cfg: DataConfig) -> DatasetSplit:
         stratify=labels,
     )
 
-    x_train = np.stack([load_image(p, cfg.image_size) for p in x_train_path], axis=0)
-    x_val = np.stack([load_image(p, cfg.image_size) for p in x_val_path], axis=0)
+    return _paths_to_arrays(x_train_path.tolist(), x_val_path.tolist(), df, cfg.image_size)
 
-    return DatasetSplit(
-        x_train=x_train,
-        y_train=y_train.astype(np.float32),
-        x_val=x_val,
-        y_val=y_val.astype(np.float32),
+
+
+def save_split_manifest(path: str | Path, train_paths: list[str], val_paths: list[str]) -> None:
+    payload = {"train_paths": train_paths, "val_paths": val_paths}
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2))
+
+
+
+def build_split_from_manifest(cfg: DataConfig, manifest_path: str | Path) -> DatasetSplit:
+    manifest = json.loads(Path(manifest_path).read_text())
+    train_paths = manifest["train_paths"]
+    val_paths = manifest["val_paths"]
+
+    df = load_dataframe(cfg)
+    return _paths_to_arrays(train_paths, val_paths, df, cfg.image_size)
+
+
+
+def split_paths(cfg: DataConfig) -> tuple[list[str], list[str]]:
+    df = load_dataframe(cfg)
+    paths = df["full_path"].values
+    labels = df["label"].values
+    train_paths, val_paths, _, _ = train_test_split(
+        paths,
+        labels,
+        test_size=cfg.test_size,
+        random_state=cfg.split_seed,
+        stratify=labels,
     )
+    return train_paths.tolist(), val_paths.tolist()
 
 
 

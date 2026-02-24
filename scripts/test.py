@@ -6,7 +6,7 @@ from pathlib import Path
 import tensorflow as tf
 
 from solar_fault.config import load_config
-from solar_fault.data import make_split
+from solar_fault.data import make_split, build_split_from_manifest
 from solar_fault.evaluate import evaluate_binary_classifier, save_metrics
 
 
@@ -25,6 +25,12 @@ def parse_args():
         default=None,
         help="Optional output path for test metrics JSON (default: <model_dir>/test_metrics.json).",
     )
+    p.add_argument(
+        "--split-manifest",
+        type=str,
+        default=None,
+        help="Optional split manifest path. Defaults to <model_dir>/split_manifest.json when available.",
+    )
     return p.parse_args()
 
 
@@ -38,7 +44,15 @@ def main():
             f"Saved model not found at '{model_path}'. Train once with scripts/train.py, then re-run this script."
         )
 
-    split = make_split(cfg.data)
+    default_manifest = cfg.model_dir / "split_manifest.json"
+    manifest_path = Path(args.split_manifest) if args.split_manifest else default_manifest
+    if manifest_path.exists():
+        split = build_split_from_manifest(cfg.data, manifest_path)
+        print(f"Loaded split manifest: {manifest_path}")
+    else:
+        split = make_split(cfg.data)
+        print("Split manifest not found; using deterministic split from config.")
+
     model = tf.keras.models.load_model(model_path)
 
     y_prob = model.predict(split.x_val, verbose=0).ravel()

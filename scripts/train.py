@@ -6,7 +6,7 @@ from pathlib import Path
 import tensorflow as tf
 
 from solar_fault.config import load_config
-from solar_fault.data import make_split, class_weights
+from solar_fault.data import make_split, class_weights, split_paths, save_split_manifest
 from solar_fault.model import build_model, fine_tune
 from solar_fault.evaluate import evaluate_binary_classifier, save_metrics
 
@@ -29,6 +29,9 @@ def main():
         tf.keras.mixed_precision.set_global_policy("mixed_float16")
 
     split = make_split(cfg.data)
+    train_paths, val_paths = split_paths(cfg.data)
+    save_split_manifest(cfg.model_dir / "split_manifest.json", train_paths, val_paths)
+
     weights = class_weights(split.y_train)
 
     train_aug = tf.keras.Sequential(
