@@ -62,8 +62,10 @@ def main():
     save_metrics(metrics, out_path)
     print(f"Loaded model: {model_path}")
     print(f"Saved metrics: {out_path}")
-    print(f"ROC-AUC: {metrics['roc_auc']:.4f}")
-    print(f"PR-AUC: {metrics['average_precision']:.4f}")
+    roc_auc = metrics["roc_auc"]
+    pr_auc = metrics["average_precision"]
+    print(f"ROC-AUC: {roc_auc:.4f}" if roc_auc is not None else "ROC-AUC: N/A (single-class validation set)")
+    print(f"PR-AUC: {pr_auc:.4f}" if pr_auc is not None else "PR-AUC: N/A (single-class validation set)")
 
 
 if __name__ == "__main__":

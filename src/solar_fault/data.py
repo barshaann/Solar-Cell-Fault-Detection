@@ -19,6 +19,8 @@ class DatasetSplit:
     y_train: np.ndarray
     x_val: np.ndarray
     y_val: np.ndarray
+    train_paths: list[str]
+    val_paths: list[str]
 
 
 
@@ -48,8 +50,9 @@ def load_dataframe(cfg: DataConfig) -> pd.DataFrame:
 
 
 def load_image(path: str, image_size: int) -> np.ndarray:
-    img = Image.open(path).convert("RGB").resize((image_size, image_size))
-    arr = np.asarray(img, dtype=np.float32) / 255.0
+    with Image.open(path) as img:
+        rgb = img.convert("RGB").resize((image_size, image_size))
+        arr = np.asarray(rgb, dtype=np.float32) / 255.0
     return arr
 
 
@@ -57,12 +60,27 @@ def load_image(path: str, image_size: int) -> np.ndarray:
 def _paths_to_arrays(train_paths: list[str], val_paths: list[str], df: pd.DataFrame, image_size: int) -> DatasetSplit:
     label_map = {row.full_path: int(row.label) for row in df.itertuples(index=False)}
 
+    missing_paths = [p for p in [*train_paths, *val_paths] if p not in label_map]
+    if missing_paths:
+        raise ValueError(
+            "Split manifest contains paths not present after current label policy/filtering. "
+            "Re-train or regenerate split manifest for the current config. "
+            f"Example missing path: {missing_paths[0]}"
+        )
+
     x_train = np.stack([load_image(p, image_size) for p in train_paths], axis=0)
     x_val = np.stack([load_image(p, image_size) for p in val_paths], axis=0)
     y_train = np.array([label_map[p] for p in train_paths], dtype=np.float32)
     y_val = np.array([label_map[p] for p in val_paths], dtype=np.float32)
 
-    return DatasetSplit(x_train=x_train, y_train=y_train, x_val=x_val, y_val=y_val)
+    return DatasetSplit(
+        x_train=x_train,
+        y_train=y_train,
+        x_val=x_val,
+        y_val=y_val,
+        train_paths=train_paths,
+        val_paths=val_paths,
+    )
 
 
 
@@ -102,17 +120,8 @@ def build_split_from_manifest(cfg: DataConfig, manifest_path: str | Path) -> Dat
 
 
 def split_paths(cfg: DataConfig) -> tuple[list[str], list[str]]:
-    df = load_dataframe(cfg)
-    paths = df["full_path"].values
-    labels = df["label"].values
-    train_paths, val_paths, _, _ = train_test_split(
-        paths,
-        labels,
-        test_size=cfg.test_size,
-        random_state=cfg.split_seed,
-        stratify=labels,
-    )
-    return train_paths.tolist(), val_paths.tolist()
+    split = make_split(cfg)
+    return split.train_paths, split.val_paths
 
 
 
