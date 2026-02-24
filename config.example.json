@@ -1,0 +1,24 @@
+{
+  "data": {
+    "dataset_root": "dataset",
+    "labels_file": "labels.csv",
+    "image_dir": "images",
+    "image_size": 224,
+    "split_seed": 42,
+    "test_size": 0.2,
+    "uncertain_policy": "drop",
+    "fault_threshold": 0.66,
+    "non_fault_threshold": 0.33
+  },
+  "train": {
+    "batch_size": 32,
+    "epochs": 30,
+    "learning_rate": 0.0001,
+    "dropout": 0.3,
+    "dense_units": 256,
+    "patience": 8,
+    "mixed_precision": false
+  },
+  "model_dir": "artifacts",
+  "model_name": "solar_fault_detector.keras"
+}

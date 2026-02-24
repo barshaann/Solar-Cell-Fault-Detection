@@ -1,0 +1,9 @@
+numpy
+pandas
+pillow
+scikit-learn
+tensorflow>=2.15
+opencv-python
+gradio
+jupyterlab
+ipykernel
