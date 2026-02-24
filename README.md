@@ -6,7 +6,7 @@ This repository now includes a production-style training and inference pipeline 
 
 - Config-driven training (`config.example.json`).
 - Deterministic data split and clean label-policy handling.
-- Class-weighted training to handle imbalance.
+- Class-weighted training to handle imbalance (sample-weighted tf.data pipeline).
 - Transfer learning with EfficientNetV2 and optional fine-tuning.
 - Validation/test metrics export (`artifacts/metrics.json`, `artifacts/test_metrics.json`).
 - Gradio app for prediction + Grad-CAM + defect box visualization.
@@ -40,7 +40,7 @@ python scripts/train.py --config config.example.json --fine-tune
 By default this saves:
 
 - model: `artifacts/solar_fault_detector.keras`
-- split manifest: `artifacts/split_manifest.json` (same validation split reused for later test runs)
+- split manifest: `artifacts/split_manifest.json` (same validation split reused for later test runs; validated against current label policy)
 
 ## Test later (after restart, no retraining needed)
 

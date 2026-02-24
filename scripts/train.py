@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import tensorflow as tf
 
 from solar_fault.config import load_config
-from solar_fault.data import make_split, class_weights, split_paths, save_split_manifest
+from solar_fault.data import make_split, class_weights, save_split_manifest
 from solar_fault.model import build_model, fine_tune
 from solar_fault.evaluate import evaluate_binary_classifier, save_metrics
 
@@ -29,10 +30,10 @@ def main():
         tf.keras.mixed_precision.set_global_policy("mixed_float16")
 
     split = make_split(cfg.data)
-    train_paths, val_paths = split_paths(cfg.data)
-    save_split_manifest(cfg.model_dir / "split_manifest.json", train_paths, val_paths)
+    save_split_manifest(cfg.model_dir / "split_manifest.json", split.train_paths, split.val_paths)
 
     weights = class_weights(split.y_train)
+    sample_weights = np.array([weights[int(y)] for y in split.y_train.astype(int)], dtype=np.float32)
 
     train_aug = tf.keras.Sequential(
         [
@@ -55,28 +56,32 @@ def main():
         tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.3, patience=3),
     ]
 
-    x_train = train_aug(split.x_train, training=True)
+    train_ds = tf.data.Dataset.from_tensor_slices((split.x_train, split.y_train, sample_weights))
+    train_ds = train_ds.shuffle(len(split.y_train), reshuffle_each_iteration=True)
+    train_ds = train_ds.batch(cfg.train.batch_size)
+    train_ds = train_ds.map(
+        lambda x, y, sw: (train_aug(x, training=True), y, sw),
+        num_parallel_calls=tf.data.AUTOTUNE,
+    )
+    train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
+
+    val_ds = tf.data.Dataset.from_tensor_slices((split.x_val, split.y_val)).batch(cfg.train.batch_size).prefetch(tf.data.AUTOTUNE)
+
     model.fit(
-        x_train,
-        split.y_train,
-        validation_data=(split.x_val, split.y_val),
+        train_ds,
+        validation_data=val_ds,
         epochs=cfg.train.epochs,
-        batch_size=cfg.train.batch_size,
         callbacks=callbacks,
-        class_weight=weights,
         verbose=2,
     )
 
     if args.fine_tune:
         fine_tune(model)
         model.fit(
-            split.x_train,
-            split.y_train,
-            validation_data=(split.x_val, split.y_val),
+            train_ds,
+            validation_data=val_ds,
             epochs=max(10, cfg.train.epochs // 2),
-            batch_size=cfg.train.batch_size,
             callbacks=callbacks,
-            class_weight=weights,
             verbose=2,
         )
 
